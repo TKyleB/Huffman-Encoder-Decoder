@@ -67,30 +67,33 @@ def encode(input_file_path: Path, output_file_path: Path, huffman_tree_base_node
             byte_data = int(remaining_bits, 2).to_bytes(1, byteorder="big")
             output_file.write(byte_data)        
 def decode(input_file_path: Path, output_file_path: Path) -> None:
+    CHUNK_SIZE = 1024 * 8
+    decoded_text = []
     with open(input_file_path, "rb") as input_file:
         header_length = int.from_bytes(input_file.read(4), byteorder="big")
         header_bytes = input_file.read(header_length)
         header_data = pickle.loads(header_bytes)
         huffman_codes = generate_huffman_codes(header_data)
-        bitstream = ""
-        byte = input_file.read(1)
-        while byte:
-             byte = ord(byte)
-             bitstream += f"{byte:08b}"
-             byte = input_file.read(1)
+        huffman_codes = dict((v ,k) for k, v in huffman_codes.items())
         
-        decoded_data = ""
+        chunk = input_file.read(CHUNK_SIZE)
+        bitstream = ""
         current_code = ""
-        for bit in bitstream:
-            current_code += bit
-            for char, code in huffman_codes.items():
-                if current_code == code:
-                    decoded_data += char
-                    current_code = ""
-                    break
+        while chunk:
+            for byte in chunk:
+                bitstream = f"{byte:08b}"
+                for bit in bitstream:
+                    current_code += bit
+                    try:
+                        text = huffman_codes[current_code]
+                        decoded_text.append(text)
+                        current_code = ""
+                    except KeyError:
+                        pass
+            chunk = input_file.read(CHUNK_SIZE)
                 
     with open(output_file_path, "wt", encoding="utf-8") as output_file:
-        output_file.write(decoded_data)
+        output_file.write("".join(decoded_text))
              
 
 if __name__ == '__main__':
